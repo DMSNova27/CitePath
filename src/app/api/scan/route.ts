@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { scanWebsite } from "@/lib/analyzer";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,7 +11,20 @@ const requestSchema = z.object({
   businessName: z.string().trim().max(160).optional(),
 });
 
+function clientKey(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  return (forwarded?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "anonymous").slice(0, 120);
+}
+
 export async function POST(request: Request) {
+  const limit = rateLimit(clientKey(request));
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Too many scans. Please wait a moment and try again." },
+      { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
+
   try {
     const body = await request.json();
     const parsed = requestSchema.safeParse(body);
