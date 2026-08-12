@@ -1,22 +1,67 @@
-import Link from "next/link";
+"use client";
 
-export default async function ScanPage({ searchParams }: { searchParams: Promise<{ url?: string }> }) {
-  const params = await searchParams;
-  const url = params.url ?? "";
+import Link from "next/link";
+import { FormEvent, useState } from "react";
+import type { ScanReport } from "@/lib/analyzer";
+
+const severityOrder = { CRITICAL: 0, IMPORTANT: 1, NEEDS_ATTENTION: 2, GOOD: 3 } as const;
+
+export default function ScanPage() {
+  const [url, setUrl] = useState("");
+  const [businessName, setBusinessName] = useState("");
+  const [report, setReport] = useState<ScanReport | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault(); setError(""); setReport(null); setBusy(true);
+    try {
+      const response = await fetch("/api/scan", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url, businessName: businessName || undefined }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "The website could not be scanned.");
+      setReport(data.report);
+    } catch (err) { setError(err instanceof Error ? err.message : "The website could not be scanned."); }
+    finally { setBusy(false); }
+  }
+
+  const findings = report ? [...report.findings].sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]) : [];
 
   return (
-    <main style={{ maxWidth: 820, margin: "0 auto", padding: "48px 24px 100px" }}>
-      <Link href="/" style={{ fontWeight: 800 }}>CitePath</Link>
-      <section style={{ paddingTop: 90 }}>
-        <p style={{ color: "var(--accent)", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: ".08em" }}>Website scan</p>
-        <h1 style={{ fontSize: "clamp(40px, 7vw, 64px)", lineHeight: 1, letterSpacing: "-0.05em", margin: "18px 0" }}>Let’s inspect the public web presence.</h1>
-        <p style={{ color: "var(--muted)", fontSize: 18, lineHeight: 1.55 }}>The secure crawler and deterministic analysis engine are being built here. This route already validates the product flow without pretending that a scan has happened.</p>
-        <div style={{ marginTop: 34, padding: 22, border: "1px solid var(--line)", borderRadius: 18, background: "var(--soft)" }}>
-          <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>URL submitted</div>
-          <code style={{ wordBreak: "break-all" }}>{url || "No URL supplied"}</code>
-        </div>
-        <p style={{ marginTop: 18, color: "var(--muted)", fontSize: 13 }}>No result is fabricated at this stage. The crawler will be connected in the next implementation phase.</p>
+    <main className="page-shell">
+      <nav className="nav"><Link href="/" className="brand">CitePath</Link><Link href="/methodology" className="nav-link">Methodology</Link></nav>
+      <section className="scan-hero">
+        <p className="eyebrow">Live website analysis</p>
+        <h1>See what your public website actually communicates.</h1>
+        <p className="lead">We inspect observable website signals and turn them into evidence-backed fixes. No guaranteed AI rankings. No invented visibility claims.</p>
+        <form className="scan-form" onSubmit={submit}>
+          <label>Website URL<input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://yourbusiness.com" type="url" required /></label>
+          <label>Business name <span>(optional)</span><input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Acme Landscapes" maxLength={160} /></label>
+          <button disabled={busy} type="submit">{busy ? "Scanning…" : "Scan website"}</button>
+        </form>
+        {busy && <div className="progress" role="status" aria-live="polite">Checking accessibility · extracting facts · reviewing structure · building findings</div>}
+        {error && <div className="error" role="alert">{error}</div>}
       </section>
+
+      {report && <section className="report" aria-label="Website readiness report">
+        <div className="report-head">
+          <div><p className="eyebrow">Report · {new Date(report.scannedAt).toLocaleString()}</p><h2>{report.businessName || report.title || new URL(report.finalUrl).hostname}</h2><p className="muted">{report.finalUrl}</p></div>
+          <div className="readiness"><span>Readiness</span><strong>{report.readiness}</strong></div>
+        </div>
+        <div className="snapshot">
+          <div><b>{report.findings.filter((f) => f.severity === "GOOD").length}</b><span>strong signals</span></div>
+          <div><b>{report.findings.filter((f) => f.severity === "NEEDS_ATTENTION").length}</b><span>needs attention</span></div>
+          <div><b>{report.findings.filter((f) => f.severity === "IMPORTANT").length}</b><span>important gaps</span></div>
+          <div><b>{report.structuredDataTypes.length}</b><span>structured types</span></div>
+        </div>
+        <div className="findings">
+          <div className="section-title"><p className="eyebrow">Evidence</p><h3>What to fix first</h3></div>
+          {findings.map((finding) => <article className="finding" key={finding.id}>
+            <div className={`severity severity-${finding.severity.toLowerCase().replaceAll("_", "-")}`}>{finding.severity.replaceAll("_", " ")}</div>
+            <div><h4>{finding.title}</h4><p><b>What:</b> {finding.what}</p><p><b>Why:</b> {finding.why}</p><p><b>Fix:</b> {finding.fix}</p>{finding.evidence && <p className="evidence"><b>Evidence:</b> {finding.evidence}</p>}{finding.url && <p className="source">Source: {finding.url}</p>}</div>
+          </article>)}
+        </div>
+        <div className="facts"><h3>Observed website signals</h3><p><b>Title:</b> {report.title || "Not detected"}</p><p><b>Headings:</b> {report.headings.length ? report.headings.join(" · ") : "None detected"}</p><p><b>Links:</b> {report.links}</p><p><b>Structured data:</b> {report.structuredDataTypes.length ? report.structuredDataTypes.join(", ") : "None detected"}</p><p><b>robots.txt:</b> {report.robots} · <b>sitemap:</b> {report.sitemap}</p></div>
+      </section>}
     </main>
   );
 }
