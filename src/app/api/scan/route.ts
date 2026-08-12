@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const requestSchema = z.object({
-  url: z.string().trim().min(1).max(2048),
+  url: z.string().trim().min(1).max(2048).refine((value) => !/^[a-z][a-z0-9+.-]*:/i.test(value) || /^https?:\/\//i.test(value), "Only HTTP and HTTPS URLs are allowed."),
   businessName: z.string().trim().max(160).optional(),
 });
 
@@ -14,8 +14,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const parsed = requestSchema.safeParse(body);
-    if (!parsed.success) return NextResponse.json({ error: "Enter a valid public website URL." }, { status: 400 });
-
+    if (!parsed.success) return NextResponse.json({ error: "Enter a valid public HTTP or HTTPS website URL." }, { status: 400 });
     const report = await scanWebsite(parsed.data.url, parsed.data.businessName);
     return NextResponse.json({ report }, { status: 200, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
