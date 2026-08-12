@@ -31,7 +31,7 @@ export type ScanReport = {
   links: number;
   structuredDataTypes: string[];
   robots: "found" | "missing" | "blocked" | "unavailable";
-  sitemap: "found" | "missing" | "unavailable";
+  sitemap: "found" | "missing" | "blocked" | "unavailable";
   readiness: "STRONG" | "GOOD" | "NEEDS ATTENTION" | "IMPORTANT GAPS" | "CRITICAL GAPS";
   findings: Finding[];
 };
@@ -204,7 +204,7 @@ function buildFindings(args: { url: URL; finalUrl: URL; html: string; title?: st
   findings.push(hasContact ? {
     id: "contact", category: "Business identity", severity: "GOOD", title: "Contact information signals are visible", what: "The page contains contact-related language.", why: "Clear contact paths help establish a real business and support customer action.", fix: "Keep phone/email/contact details consistent across important pages.", url: finalUrl.toString()
   } : {
-    id: "contact", category: "Business identity", severity: "NEEDS_ATTENTION", title: "Contact information is not obvious", what: "The scanner did not detect strong contact language on the scanned page.", why: "A local business should make a clear contact path easy to understand.", fix: "Provide a prominent contact method and keep it consistent across the site.", url: finalUrl.toString()
+    id: "contact", category: "Business identity", severity: "NEEDS_ATTENTION", title: "Contact information is not obvious", what: "The scanner did not detect strong contact language on the scanned page.", why: "A local business should make a clear contact path easy to understand.", fix: "Provide a prominent contact method and keep it consistent across important pages.", url: finalUrl.toString()
   });
 
   findings.push(robots === "found" ? {
@@ -216,7 +216,7 @@ function buildFindings(args: { url: URL; finalUrl: URL; html: string; title?: st
   findings.push(sitemap === "found" ? {
     id: "sitemap", category: "Technical accessibility", severity: "GOOD", title: "An XML sitemap is available", what: "A standard sitemap resource was found.", why: "A sitemap provides a useful inventory of public URLs.", fix: "Keep the sitemap current and limited to canonical public URLs.", url: `${finalUrl.origin}/sitemap.xml`
   } : {
-    id: "sitemap", category: "Technical accessibility", severity: "NEEDS_ATTENTION", title: "No sitemap was detected", what: "The standard sitemap location was not available.", why: "A sitemap can make a site's public URL structure easier to discover.", fix: "Publish an XML sitemap containing important canonical public URLs.", url: `${finalUrl.origin}/sitemap.xml`
+    id: "sitemap", category: "Technical accessibility", severity: sitemap === "blocked" ? "IMPORTANT" : "NEEDS_ATTENTION", title: "No usable sitemap was detected", what: sitemap === "blocked" ? "The standard sitemap location exists but could not be retrieved." : "The standard sitemap location was not available.", why: "A sitemap can make a site's public URL structure easier to discover.", fix: "Publish an XML sitemap containing important canonical public URLs and allow legitimate crawlers to retrieve it.", url: `${finalUrl.origin}/sitemap.xml`
   });
 
   if (links === 0 || headings.length === 0) findings.push({
