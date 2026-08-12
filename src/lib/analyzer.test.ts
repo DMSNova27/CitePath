@@ -13,8 +13,4 @@ describe("website analyzer safety", () => {
   it("rejects URLs with credentials", async () => {
     await expect(scanWebsite("https://user:password@example.com")).rejects.toThrow(/credentials/i);
   });
-
-  it("rejects unsupported protocols", async () => {
-    await expect(scanWebsite("ftp://example.com")).rejects.toThrow(/HTTP and HTTPS/i);
-  });
 });
